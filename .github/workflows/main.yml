@@ -1,0 +1,243 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        engine: [pdflatex, xelatex, latex]
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Cache dependencies
+      uses: actions/cache@v2
+      with:
+        path: |
+          /tmp/texlive
+          ~/.texlive
+        key: texlive
+
+    - name: Set up TeX Live environment
+      uses: pgf-tikz/actions/install-tl@master
+      with:
+        packages:
+          dvips
+          ec
+          latex
+          latex-bin
+          luaotfload
+          luatex
+          luatexbase
+          metafont
+          mfware
+          xetex
+          atbegshi
+          atveryend
+          auxhook
+          bigintcalc
+          bitset
+          epstopdf-pkg
+          etexcmds
+          geometry
+          gettitlestring
+          graphics
+          graphics-cfg
+          graphics-def
+          hycolor
+          hyperref
+          iftex
+          infwarerr
+          intcalc
+          kvdefinekeys
+          kvoptions
+          kvsetkeys
+          l3backend
+          latex
+          latexconfig
+          letltxmacro
+          listings
+          listings-ext
+          ltxcmds
+          mptopdf
+          ms
+          pdfescape
+          pdftexcmds
+          pgf
+          refcount
+          rerunfilecheck
+          uniquecounter
+          url
+          xcolor
+
+    - name: 'Install pgf-umlcd'
+      run: |
+        tlmgr init-usertree --usertree $PWD
+        echo "TEXMFHOME=$PWD" >> $GITHUB_ENV
+
+    - name: 'Get the revision'
+      run: |
+        echo "GIT_TAG=$(git describe --abbrev=0 --tags)" >> $GITHUB_ENV
+
+    - name: 'Build the manual'
+      run: |
+        cd doc/latex/pgf-umlcd
+        while : ; do
+          ${{ matrix.engine }} -shell-escape -halt-on-error -interaction=nonstopmode pgf-umlcd-manual.tex
+          grep -q -E "(There were undefined references|Rerun to get (cross-references|the bars) right)" *.log || break
+          [ "$(( thisrun=$(( thisrun + 1 )) ))" -lt 5 ] || { echo "Reruns exceeded"; exit 1; }
+        done
+        if [ "${{ matrix.engine }}" = "latex" ]; then
+            dvips pgf-umlcd-manual.dvi
+            ps2pdf pgf-umlcd-manual.ps
+        fi
+        cd -
+
+    - name: 'ZIP: Build'
+      run: |
+        git ls-files | sed '/^\./d;/^ci/d' | tee FILES
+        echo doc/latex/pgf-umlcd/pgf-umlcd-manual.pdf | tee -a FILES
+        tar --xform='s$\(doc\|tex\)/latex/pgf-umlcd/$$g' \
+            --xform='s$^$pgf-umlcd/$g' \
+            -cvf pgf-umlcd_${GIT_TAG}.tar.gz $(cat FILES)
+
+    - name: "ZIP: Sign"
+      if: |
+        matrix.engine == 'pdflatex' &&
+        github.event_name != 'pull_request' &&
+        env.GPG_SECRET_KEY != null
+      env:
+        GPG_SECRET_KEY: ${{ secrets.GPG_SECRET_KEY }}
+        GPG_PUBLIC_KEY: ${{ secrets.GPG_PUBLIC_KEY }}
+      run: |
+        # get the keys
+        printenv GPG_SECRET_KEY > "pgf-${GIT_TAG}.sec"
+        printenv GPG_PUBLIC_KEY > "pgf-${GIT_TAG}.pub"
+        # sign the products
+        export GNUPGHOME=$(mktemp -d)
+        install -dm 0700 "$GNUPGHOME"
+        gpg --import "pgf-${GIT_TAG}.sec"
+        gpg --armor --output "pgf-umlcd_${GIT_TAG}.tar.gz.sig" --detach-sign "pgf-umlcd_${GIT_TAG}.tar.gz"
+        rm -rf "$GNUPGHOME"
+        # verify the signature against the distributed public key
+        export GNUPGHOME=$(mktemp -d)
+        install -dm 0700 "$GNUPGHOME"
+        gpg --import "pgf-${GIT_TAG}.pub"
+        gpg --verify "pgf-umlcd_${GIT_TAG}.tar.gz.sig"
+        rm -rf "$GNUPGHOME"
+
+    - name: "Release: create"
+      uses: actions/create-release@v1
+      id: create_release
+      if: matrix.engine == 'pdflatex' && startsWith(github.ref, 'refs/tags/')
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ env.GIT_TAG }}
+        release_name: ${{ env.GIT_TAG }}
+        body_path: doc/latex/pgf-umlcd/RELEASE_NOTES.md
+
+    - name: "Release: upload manual"
+      uses: actions/upload-release-asset@v1
+      if: matrix.engine == 'pdflatex' && startsWith(github.ref, 'refs/tags/')
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: doc/latex/pgf-umlcd/pgf-umlcd-manual.pdf
+        asset_name: pgf-umlcd-manual-${{ env.GIT_TAG }}.pdf
+        asset_content_type: application/pdf
+
+    - name: "Release: upload public key"
+      uses: actions/upload-release-asset@v1
+      if: matrix.engine == 'pdflatex' && startsWith(github.ref, 'refs/tags/')
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./pgf-${{ env.GIT_TAG }}.pub
+        asset_name: pgf-${{ env.GIT_TAG }}.pub
+        asset_content_type: text/plain
+
+    - name: "Release: upload ZIP"
+      uses: actions/upload-release-asset@v1
+      if: matrix.engine == 'pdflatex' && startsWith(github.ref, 'refs/tags/')
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./pgf-umlcd_${{ env.GIT_TAG }}.tar.gz
+        asset_name: pgf-umlcd_${{ env.GIT_TAG }}.tar.gz
+        asset_content_type: application/gzip
+
+    - name: "Release: upload ZIP signature"
+      uses: actions/upload-release-asset@v1
+      if: matrix.engine == 'pdflatex' && startsWith(github.ref, 'refs/tags/')
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./pgf-umlcd_${{ env.GIT_TAG }}.tar.gz.sig
+        asset_name: pgf-umlcd_${{ env.GIT_TAG }}.tar.gz.sig
+        asset_content_type: text/plain
+
+    - name: "CTAN: Validate"
+      if: matrix.engine == 'pdflatex'
+      uses: pgf-tikz/actions/ctan-upload@master
+      with:
+        action: validate
+        announcement: '<doc/latex/pgf-umlcd/RELEASE_NOTES.md'
+        author: 'The PGF/TikZ Team;Xu Yuan'
+        bugs: https://github.com/pgf-tikz/pgf-umlcd/issues
+        ctanPath: /graphics/pgf/contrib/pgf-umlcd
+        description: '<doc/latex/pgf-umlcd/description.html'
+        email: pgf-tikz@tug.org
+        file: 'pgf-umlcd_${{ env.GIT_TAG }}.tar.gz'
+        license: 'gpl2;lppl1.3c'
+        note: |
+          The release files are signed using a detached signature.  You can obtain the
+          signature from the GitHub release page
+
+          https://github.com/pgf-tikz/pgf-umlcd/releases/download/${{ env.GIT_TAG }}/pgf-umlcd_${{ env.GIT_TAG }}.tar.gz.sig
+        pkg: pgf-umlcd
+        repository: https://github.com/pgf-tikz/pgf-umlcd
+        summary: Some LaTeX macros for UML Class Diagrams
+        support: https://tug.org/mailman/listinfo/pgf-tikz
+        update: true
+        uploader: github-actions
+        version: ${{ env.GIT_TAG }}
+
+    - name: "CTAN: Upload"
+      if: |
+        matrix.engine == 'pdflatex' &&
+        startsWith(github.ref, 'refs/tags/') &&
+        github.repository == 'pgf-tikz/pgf-umlcd'
+      uses: pgf-tikz/actions/ctan-upload@master
+      with:
+        action: upload
+        announcement: '<doc/latex/pgf-umlcd/RELEASE_NOTES.md'
+        author: 'The PGF/TikZ Team;Xu Yuan'
+        bugs: https://github.com/pgf-tikz/pgf-umlcd/issues
+        ctanPath: /graphics/pgf/contrib/pgf-umlcd
+        description: '<doc/latex/pgf-umlcd/description.html'
+        email: pgf-tikz@tug.org
+        file: 'pgf-umlcd_${{ env.GIT_TAG }}.tar.gz'
+        license: 'gpl2;lppl1.3c'
+        note: |
+          The release files are signed using a detached signature.  You can obtain the
+          signature from the GitHub release page
+
+          https://github.com/pgf-tikz/pgf-umlcd/releases/download/${{ env.GIT_TAG }}/pgf-umlcd_${{ env.GIT_TAG }}.tar.gz.sig
+        pkg: pgf-umlcd
+        repository: https://github.com/pgf-tikz/pgf-umlcd
+        summary: Some LaTeX macros for UML Class Diagrams
+        support: https://tug.org/mailman/listinfo/pgf-tikz
+        update: true
+        uploader: github-actions
+        version: ${{ env.GIT_TAG }}
+
