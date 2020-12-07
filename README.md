@@ -1,6 +1,6 @@
 # pgf-umlcd
 
-[![Travis Build Status][travis-svg]][travis-link]
+![CI](https://github.com/pgf-tikz/pgf/workflows/CI/badge.svg)
 
 Some LaTeX macros for UML Class Diagrams.
 
@@ -13,6 +13,3 @@ Please read pgf-umlcd-manual.pdf for more information.
 ## License
 
 pgf-umlcd is released under the terms of both the LPPL v1.3c and the GPL v2.
-
-[travis-svg]: https://travis-ci.com/pgf-tikz/pgf-umlcd.svg?branch=master
-[travis-link]: https://travis-ci.com/pgf-tikz/pgf-umlcd
