@@ -224,7 +224,7 @@ minimum height=1cm, node distance=2cm]
 \protected@xdef\umlcdPackageFit{\umlcdPackageFitOld (\umlcdClassName)}
 }
 
-\newcommand{\attribute}[1]{%
+\newcommand{\Attribute}[1]{%
 \ifnum\c@umlcdClassAttributesNum=0
 \protected@xdef\umlcdClassAttributes{#1}
 \else
@@ -359,6 +359,11 @@ minimum height=1cm, node distance=2cm]
 \newcommand{\umlnote}[1][]{
 	\node[umlcd style, anchor=north, draw,shape=umlcdnote, text width=4cm, #1]
 }
+
+% Backwards compatibility for pdflatex/xelatex
+\expandafter\ifx\csname attribute\endcsname\relax
+	\let\attribute\Attribute
+\fi
 
 %%% End of pgf-umlcd.sty
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

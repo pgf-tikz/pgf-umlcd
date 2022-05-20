@@ -1,7 +1,7 @@
 \begin{tikzpicture}
   \begin{class}[text width=5cm]{BankAccount}{0,0}
-    \attribute{owner : String}
-    \attribute{balance : Dollars = 0}
+    \Attribute{owner : String}
+    \Attribute{balance : Dollars = 0}
 
     \operation{deposit(amount : Dollars)}
     \operation[0]{withdrawl(amount : Dollars)}
@@ -9,7 +9,7 @@
 
   \begin{class}[text width=7cm]{CheckingAccount}{-5,-5}
     \inherit{BankAccount}
-    \attribute{insufficientFundsFee : Dollars}
+    \Attribute{insufficientFundsFee : Dollars}
 
     \operation{processCheck ( checkToProcess : Check )}
     \operation{withdrawal ( amount : Dollars )}
@@ -17,7 +17,7 @@
 
   \begin{class}[text width=7cm]{SavingsAccount}{5,-5}
     \inherit{BankAccount}
-    \attribute{annualInteresRate : Percentage}
+    \Attribute{annualInteresRate : Percentage}
 
     \operation{depositMonthlyInterest ( )}
     \operation{withdrawal ( amount : Dollars )}
