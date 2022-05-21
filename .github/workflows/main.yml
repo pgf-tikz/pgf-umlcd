@@ -5,6 +5,8 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: registry.gitlab.com/islandoftex/images/texlive:latest
 
     strategy:
       matrix:
@@ -14,66 +16,6 @@ jobs:
     - uses: actions/checkout@v2
       with:
         fetch-depth: 0
-
-    - name: Cache dependencies
-      uses: actions/cache@v2
-      with:
-        path: |
-          /tmp/texlive
-          ~/.texlive
-        key: texlive
-
-    - name: Set up TeX Live environment
-      uses: pgf-tikz/actions/install-tl@master
-      with:
-        packages:
-          dvips
-          ec
-          latex
-          latex-bin
-          luaotfload
-          luatex
-          luatexbase
-          metafont
-          mfware
-          xetex
-          atbegshi
-          atveryend
-          auxhook
-          bigintcalc
-          bitset
-          epstopdf-pkg
-          etexcmds
-          geometry
-          gettitlestring
-          graphics
-          graphics-cfg
-          graphics-def
-          hycolor
-          hyperref
-          iftex
-          infwarerr
-          intcalc
-          kvdefinekeys
-          kvoptions
-          kvsetkeys
-          l3backend
-          latex
-          latexconfig
-          letltxmacro
-          listings
-          listings-ext
-          ltxcmds
-          mptopdf
-          ms
-          pdfescape
-          pdftexcmds
-          pgf
-          refcount
-          rerunfilecheck
-          uniquecounter
-          url
-          xcolor
 
     - name: 'Install pgf-umlcd'
       run: |
@@ -104,7 +46,7 @@ jobs:
         echo doc/latex/pgf-umlcd/pgf-umlcd-manual.pdf | tee -a FILES
         tar --xform='s$\(doc\|tex\)/latex/pgf-umlcd/$$g' \
             --xform='s$^$pgf-umlcd/$g' \
-            -cvf pgf-umlcd_${GIT_TAG}.tar.gz $(cat FILES)
+            -czvf pgf-umlcd_${GIT_TAG}.tar.gz $(cat FILES)
 
     - name: "ZIP: Sign"
       if: |
@@ -115,6 +57,8 @@ jobs:
         GPG_SECRET_KEY: ${{ secrets.GPG_SECRET_KEY }}
         GPG_PUBLIC_KEY: ${{ secrets.GPG_PUBLIC_KEY }}
       run: |
+        apt-get update -qq
+        DEBIAN_FRONTEND=noninteractive apt-get install -qq gpg-agent
         # get the keys
         printenv GPG_SECRET_KEY > "pgf-${GIT_TAG}.sec"
         printenv GPG_PUBLIC_KEY > "pgf-${GIT_TAG}.pub"
