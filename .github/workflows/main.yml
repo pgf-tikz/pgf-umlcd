@@ -10,7 +10,7 @@ jobs:
 
     strategy:
       matrix:
-        engine: [pdflatex, xelatex, latex]
+        engine: [pdflatex, lualatex, xelatex, latex]
 
     steps:
     - uses: actions/checkout@v2

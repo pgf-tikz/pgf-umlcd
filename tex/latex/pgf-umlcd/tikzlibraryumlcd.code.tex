@@ -1,0 +1,402 @@
+% SPDX-License-Identifier: GPL-2.0-only OR LPPL-1.3c
+
+\usetikzlibrary{arrows,shapes.multipart,backgrounds,fit}
+
+%
+% Utilities
+%
+
+\def\pgfumlcd@ifx#1#2{%
+  \ifx#1#2%
+    \expandafter\pgfutil@firstoftwo
+  \else
+    \expandafter\pgfutil@secondoftwo
+  \fi}
+
+\def\pgfumlcd@ifdim#1#2#3{%
+  \ifdim\dimexpr#1\relax#2\dimexpr#3\relax
+    \expandafter\pgfutil@firstoftwo
+  \else
+    \expandafter\pgfutil@secondoftwo
+  \fi}
+
+\def\pgfumlcd@ifnum#1#2#3{%
+  \ifnum\numexpr#1\relax#2\numexpr#3\relax
+    \expandafter\pgfutil@firstoftwo
+  \else
+    \expandafter\pgfutil@secondoftwo
+  \fi}
+
+\def\pgfumlcd@newif#1{%
+  \csname newif\expandafter\endcsname\csname ifpgfumlcd@#1\endcsname
+  \expandafter\def\csname pgfumlcd@if#1\expandafter\endcsname\expandafter{%
+    \csname ifpgfumlcd@#1\endcsname
+      \expandafter\pgfutil@firstoftwo
+    \else
+      \expandafter\pgfutil@secondoftwo
+    \fi}%
+}
+
+\expandafter\let\expandafter\pgfumlcd@xdef\csname\ifcsname protected@xdef\endcsname protected@\fi xdef\endcsname
+
+\def\umltextcolor{black}
+\def\umldrawcolor{purple}
+\def\umlfillcolor{yellow!20}
+
+\tikzset{%
+  help lines/.append style = {blue!50,very thin,dashed},
+  umlcolor/.style = {color=\umldrawcolor,fill=\umlfillcolor,text=\umltextcolor},
+  umlcd style/.style = {umlcolor, >=angle 90},
+  package/.style = {matrix, column sep=1mm, row sep=1cm, node distance=2cm},
+  packagename/.style = {rectangle, minimum height=2em},
+  umlcd style implement line/.style = {color=\umldrawcolor, open triangle 45-,dashed},
+  objectline/.style = {color=\umldrawcolor, diamond->},
+  umlcd style inherit line/.style = {color=\umldrawcolor, open triangle 45-},
+  splitline/.style = {color=\umldrawcolor, dotted,font=\pgfutil@font@itshape},
+  umlcd style class/.style = {rectangle split, rectangle split parts=3, 
+    every text node part/.style={text centered},
+    draw, minimum height=2em, umlcolor, minimum width=2cm, text width=5cm,
+    minimum height=1cm, node distance=2cm},
+  umlcd style dashed line/.style = {color=\umldrawcolor, >=angle 90,dashed},
+  umlcd style school/.style = {},
+}
+
+\pgfumlcd@newif{school}
+\pgfumlcd@newif{simplified}
+
+% declare layers
+\pgfdeclarelayer{background}
+\pgfdeclarelayer{connectionlayers}
+\pgfsetlayers{background,connectionlayers,main}
+
+\newcount\pgfumlcd@ClassAttributesNum
+\newcount\pgfumlcd@ClassOperationsNum
+\newcount\pgfumlcd@ClassAbstractClassNum
+\newcount\pgfumlcd@ClassInterfaceNum
+\newcount\pgfumlcd@ClassSplitPartNum
+
+\def\pgfumlcd@PackageFit{}
+
+\def\pgfumlcd@class{\pgfutil@ifnextchar[{\pgfumlcd@class@}{\pgfumlcd@class@[]}}
+\def\pgfumlcd@class@[#1]#2#3{%
+  \pgfumlcd@classAndInterfaceCommon{#1}{#2}{#3}%
+}
+\def\endpgfumlcd@class{%
+    \pgfumlcd@calcuateNumberOfParts{}%
+    \node[anchor=north,this umlcd style] (\pgfumlcd@ClassName) at (\pgfumlcd@ClassPos) {%
+      {\pgfutil@font@bfseries\pgfumlcd@ClassName} % <-- explicit space
+      \pgfumlcd@insertAttributesAndOperations{}%
+    };%
+  \endpgfumlcd@classAndInterfaceCommon
+}
+
+\def\pgfumlcd@interface{\pgfutil@ifnextchar[{\pgfumlcd@interface@}{\pgfumlcd@interface@[]}}
+\def\pgfumlcd@interface@[#1]#2#3{%
+  \pgfumlcd@classAndInterfaceCommon{#1}{#2}{#3}%
+}
+\def\endpgfumlcd@interface{%
+    \pgfumlcd@calcuateNumberOfParts{}%
+    \node[anchor=north,this umlcd style] (\pgfumlcd@ClassName) at (\pgfumlcd@ClassPos) {%
+      $<<$interface$>>$\break
+      {\pgfutil@font@bfseries\pgfumlcd@ClassName} % <-- explicit space
+      \pgfumlcd@insertAttributesAndOperations{}%
+    };%
+  \endpgfumlcd@classAndInterfaceCommon
+}
+
+\def\pgfumlcd@abstractclass{\pgfutil@ifnextchar[{\pgfumlcd@abstractclass@}{\pgfumlcd@abstractclass@[]}}
+\def\pgfumlcd@abstractclass@[#1]#2#3{%
+  \pgfumlcd@classAndInterfaceCommon{#1}{#2}{#3}%
+}
+\def\endpgfumlcd@abstractclass{%
+    \pgfumlcd@calcuateNumberOfParts{}
+    \node[anchor=north,this umlcd style] (\pgfumlcd@ClassName) at (\pgfumlcd@ClassPos) {%
+      $<<$abstract$>>$\break
+      {\pgfutil@font@bfseries\pgfumlcd@ClassName} % <-- explicit space
+      \pgfumlcd@insertAttributesAndOperations{}%
+    };%
+  \endpgfumlcd@classAndInterfaceCommon
+}
+
+\def\pgfumlcd@staticclass{\pgfutil@ifnextchar[{\pgfumlcd@staticclass@}{\pgfumlcd@staticclass@[]}}
+\def\pgfumlcd@staticclass@[#1]#2#3{%
+  \pgfumlcd@classAndInterfaceCommon{#1}{#2}{#3}%
+}
+\def\endpgfumlcd@staticclass{%
+    \pgfumlcd@calcuateNumberOfParts{}
+    \node[anchor=north,this umlcd style] (\pgfumlcd@ClassName) at (\pgfumlcd@ClassPos) {%
+      $<<$static$>>$\break
+      {\pgfutil@font@bfseries\pgfumlcd@ClassName} % <-- explicit space
+      \pgfumlcd@insertAttributesAndOperations{}%
+    };%
+  \endpgfumlcd@classAndInterfaceCommon
+}
+
+% TODO: here the name of \pgfumlcd@ClassName and \umlObjectName should be
+% switched, it is only for reusing \classAndInterfaceCommon at the
+% moment.
+\def\pgfumlcd@object{\pgfutil@ifnextchar[{\pgfumlcd@object@}{\pgfumlcd@object@[]}}
+\def\pgfumlcd@object@[#1]#2#3{%
+  \pgfumlcd@classAndInterfaceCommon{#1}{#2}{#3}%
+    \def\pgfumlcd@@instanceOf{}
+}
+\def\endpgfumlcd@object{%
+    % customized
+    \pgfumlcd@ifsimplified{%
+      \pgfumlcd@calcuateNumberOfParts{}%
+    }{%
+      \pgfumlcd@ifnum{\pgfumlcd@ClassOperationsNum}{>}{0}{%
+        \pgfumlcd@ClassSplitPartNum=3
+        \pgfumlcd@xdef\pgfumlcd@SplitPart{3}%
+      }{%
+        \pgfumlcd@ClassSplitPartNum=2
+        \pgfumlcd@xdef\pgfumlcd@SplitPart{2}%
+      }%
+    }%
+    \pgfumlcd@ifx{\pgfumlcd@@instanceOf}{\pgfutil@empty}{%
+      \def\pgfumlcd@ObjectName{\pgfumlcd@ClassName}%
+    }{%
+      \def\pgfumlcd@ObjectName{\pgfumlcd@ClassName : \pgfumlcd@@instanceOf}%
+    }%
+    \node[anchor=north,this umlcd style,umlcd style school] (\pgfumlcd@ClassName) at (\pgfumlcd@ClassPos) {%
+      \pgfumlcd@ifschool{%
+        {\pgfutil@font@bfseries\pgfumlcd@ObjectName}%
+      }{%
+        \underline{\pgfutil@font@bfseries\pgfumlcd@ObjectName}%
+      } % <-- explicit space
+      \pgfumlcd@insertAttributesAndOperations{}%
+    };%
+  \endpgfumlcd@classAndInterfaceCommon
+}
+
+\def\pgfumlcd@insertAttributesAndOperations{%
+  \pgfumlcd@ifnum{\pgfumlcd@ClassSplitPartNum}{>}{1}{%
+    \nodepart{second}%
+  }{}%
+  \pgfumlcd@ClassAttributes
+  \pgfumlcd@ifnum{\pgfumlcd@ClassSplitPartNum}{>}{2}{%
+    \nodepart{third}%
+  }{}%
+  \pgfumlcd@ClassOperations
+}
+
+\def\pgfumlcd@calcuateNumberOfParts{%
+  % calcuate the number of parts
+  \pgfumlcd@ifsimplified{%
+    \pgfumlcd@ClassSplitPartNum=1
+    \pgfumlcd@ifnum{\pgfumlcd@ClassAttributesNum}{>}{0}{%
+      \advance\pgfumlcd@ClassSplitPartNum by 1
+    }{}%
+    \pgfumlcd@ifnum{\pgfumlcd@ClassOperationsNum}{>}{0}{%
+      \advance\pgfumlcd@ClassSplitPartNum by 1
+    }{}%
+  }{%
+    \pgfumlcd@ClassSplitPartNum=3 % three parts by default
+  }%
+  \pgfumlcd@xdef\pgfumlcd@SplitPart{3}
+  \pgfumlcd@ifnum{\pgfumlcd@ClassSplitPartNum}{=}{1}{%
+    \pgfumlcd@xdef\pgfumlcd@SplitPart{1}%
+  }{}%
+  \pgfumlcd@ifnum{\pgfumlcd@ClassSplitPartNum}{=}{2}{%
+    \pgfumlcd@xdef\pgfumlcd@SplitPart{2}%
+  }{}%
+}
+
+\def\pgfumlcd@classAndInterfaceCommon#1#2#3{%
+  \def\pgfumlcd@ClassName{#2}%
+  \def\pgfumlcd@ClassPos{#3}
+  \def\pgfumlcd@ClassAttributes{}%
+  \def\pgfumlcd@ClassOperations{}%
+  \def\pgfumlcd@ClassAbstractClass{}%
+  \def\pgfumlcd@ClassInterface{}%
+  \pgfumlcd@ClassAttributesNum=0
+  \pgfumlcd@ClassOperationsNum=0
+  \pgfumlcd@ClassAbstractClassNum=0
+  \pgfumlcd@ClassInterfaceNum=0
+  \tikzset{%
+    this umlcd style/.style={%
+      umlcd style class,%
+      rectangle split parts=\pgfumlcd@SplitPart,%
+      #1}%
+  }
+}%
+\def\endpgfumlcd@classAndInterfaceCommon{%
+  %% connections
+  \pgfonlayer{connectionlayers}%
+    \pgfumlcd@ifnum{\pgfumlcd@ClassAbstractClassNum}{>}{0}{%
+      \foreach \c in \pgfumlcd@ClassAbstractClass {%
+        \draw [umlcd style inherit line] (\c) -- (\pgfumlcd@ClassName);%
+      }%
+    }{}%
+    \pgfumlcd@ifnum{\pgfumlcd@ClassInterfaceNum}{>}{0}{%
+      \foreach \c in \pgfumlcd@ClassInterface {%
+        \draw [umlcd style implement line] (\c) -- (\pgfumlcd@ClassName);%
+      }%
+    }{}%
+  \endpgfonlayer
+  %% add to fit
+  \let\pgfumlcd@PackageFitOld\pgfumlcd@PackageFit
+  \pgfumlcd@xdef\pgfumlcd@PackageFit{\pgfumlcd@PackageFitOld (\pgfumlcd@ClassName)}%
+}
+
+\def\pgfumlcd@attribute#1{%
+  \pgfumlcd@ifnum{\pgfumlcd@ClassAttributesNum}{=}{0}{%
+    \pgfumlcd@xdef\pgfumlcd@ClassAttributes{#1}%
+  }{%
+    \let\pgfumlcd@ClassAttributesOld\pgfumlcd@ClassAttributes
+    \pgfumlcd@xdef\pgfumlcd@ClassAttributes{\pgfumlcd@ClassAttributesOld\break#1}%
+  }%
+  \advance\pgfumlcd@ClassAttributesNum by 1
+}
+
+\def\pgfumlcd@operation{\pgfutil@ifnextchar[{\pgfumlcd@operation@}{\pgfumlcd@operation@[1]}}
+\def\pgfumlcd@operation@[#1]#2{%
+  \advance\pgfumlcd@ClassOperationsNum by 1
+  \def\pgfumlcd@virtualoperation{#2}
+  \pgfumlcd@ifnum{0}{=}{#1}{%
+    \def\pgfumlcd@virtualoperation{{\pgfutil@font@itshape#2}}%
+  }{}%
+  \pgfumlcd@ifnum{\pgfumlcd@ClassOperationsNum}{=}{1}{%
+    \pgfumlcd@xdef\pgfumlcd@ClassOperations{\pgfumlcd@virtualoperation}%
+  }{%
+    \let\pgfumlcd@ClassOperationsOld\pgfumlcd@ClassOperations
+    \pgfumlcd@xdef\pgfumlcd@ClassOperations{\pgfumlcd@ClassOperationsOld\break\pgfumlcd@virtualoperation}%
+  }%
+}
+
+\def\pgfumlcd@inherit#1{%
+  \advance\pgfumlcd@ClassAbstractClassNum by 1
+  \pgfumlcd@ifnum{\pgfumlcd@ClassAbstractClassNum}{=}{1}{%
+    \pgfumlcd@xdef\pgfumlcd@ClassAbstractClass{#1}%
+  }{%
+    \let\pgfumlcd@ClassAbstractClassOld\pgfumlcd@ClassAbstractClass
+    \pgfumlcd@xdef\pgfumlcd@ClassAbstractClass{\pgfumlcd@ClassAbstractClassOld, #1}%
+  }%
+}
+
+\def\pgfumlcd@implement#1{%
+  \advance\pgfumlcd@ClassInterfaceNum by 1
+  \pgfumlcd@ifnum{\pgfumlcd@ClassInterfaceNum}{=}{1}{%
+    \pgfumlcd@xdef\pgfumlcd@ClassInterface{#1}
+  }{%
+    \let\pgfumlcd@ClassInterfaceOld\pgfumlcd@ClassInterface
+    \pgfumlcd@xdef\pgfumlcd@ClassInterface{\pgfumlcd@ClassInterfaceOld, #1}
+  }%
+}
+
+\def\pgfumlcd@instanceOf#1{\def\pgfumlcd@@instanceOf{#1}}
+
+\def\pgfumlcd@association{\pgfutil@ifnextchar[{\pgfumlcd@association@}{\pgfumlcd@association@[]}}
+\def\pgfumlcd@association@[#1]#2#3#4#5#6#7{%
+  \draw [umlcd style,#1] (#2) -- (#5)
+    node[near start, auto]{#3}
+    node[near start, auto, swap]{#4}
+    node[near end, auto]{#6}
+    node[near end, auto, swap]{#7};%
+}
+
+\def\pgfumlcd@unidirectionalAssociation{%
+  \pgfutil@ifnextchar[{\pgfumlcd@unidirectionalAssociation@}{\pgfumlcd@unidirectionalAssociation@[]}}
+\def\pgfumlcd@unidirectionalAssociation@[#1]#2#3#4#5{%
+  \draw [umlcd style,->,#1] (#2) -- (#5)
+    node[near end, auto]{#3}
+    node[near end, auto, swap]{#4};%
+}
+
+\def\pgfumlcd@aggregation{\pgfutil@ifnextchar[{\pgfumlcd@aggregation@}{\pgfumlcd@aggregation@[]}}
+\def\pgfumlcd@aggregation@[#1]#2#3#4#5{%
+  \draw[umlcd style,open diamond->,#1] (#2) -- (#5)
+    node[near end, auto]{#3}
+    node[near end, auto, swap]{#4};%
+}
+
+\def\pgfumlcd@composition{\pgfutil@ifnextchar[{\pgfumlcd@composition@}{\pgfumlcd@composition@[]}}
+\def\pgfumlcd@composition@[#1]#2#3#4#5{%
+  \draw[umlcd style,fill=\umldrawcolor,diamond->,#1] (#2) -- (#5)
+    node[near end, auto]{#3}
+    node[near end, auto, swap]{#4};%
+}
+
+\def\pgfumlcd@package#1{%
+  \def\pgfumlcd@PackageFit{}%
+  \def\pgfumlcd@PackageName{#1}%
+}
+\def\endpgfumlcd@package{%
+  \pgfonlayer{background}%
+    \node[umlcd style,draw,inner sep=0.5cm,fit=\pgfumlcd@PackageFit] (\pgfumlcd@PackageName) {};%
+    \node[umlcd style,draw,outer ysep=-0.5,anchor=south west] (\pgfumlcd@PackageName caption) at
+    (\pgfumlcd@PackageName.north west) {\pgfumlcd@PackageName};%
+  \endpgfonlayer
+}
+
+\def\switchUmlcdSchool{%
+  \pgfumlcd@ifschool{%
+    \tikzset{umlcd style school/.style={}}%
+    \pgfumlcd@schoolfalse
+  }{%
+    \tikzset{umlcd style school/.style = {rounded corners}}%
+    \pgfumlcd@schooltrue
+  }%
+}
+
+\pgfdeclareshape{umlcdnote}{%
+  \inheritsavedanchors[from=rectangle]% this is nearly a rectangle
+  \inheritanchorborder[from=rectangle]%
+  \inheritanchor[from=rectangle]{center}%
+  \inheritanchor[from=rectangle]{north}%
+  \inheritanchor[from=rectangle]{south}%
+  \inheritanchor[from=rectangle]{west}%
+  \inheritanchor[from=rectangle]{east}%
+  % ... and possibly more
+  \backgroundpath{% this is new
+    % store lower right in xa/ya and upper right in xb/yb
+    \southwest \pgf@xa=\pgf@x \pgf@ya=\pgf@y
+    \northeast \pgf@xb=\pgf@x \pgf@yb=\pgf@y
+    % compute corner of flipped page
+    \pgf@xc=\pgf@xb \advance\pgf@xc by-10pt % this should be a parameter
+    \pgf@yc=\pgf@yb \advance\pgf@yc by-10pt
+    % construct main path
+    \pgfpathmoveto{\pgfpoint{\pgf@xa}{\pgf@ya}}%
+    \pgfpathlineto{\pgfpoint{\pgf@xa}{\pgf@yb}}%
+    \pgfpathlineto{\pgfpoint{\pgf@xc}{\pgf@yb}}%
+    \pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@yc}}%
+    \pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@ya}}%
+    \pgfpathclose
+    % add little corner
+    \pgfpathmoveto{\pgfpoint{\pgf@xc}{\pgf@yb}}%
+    \pgfpathlineto{\pgfpoint{\pgf@xc}{\pgf@yc}}%
+    \pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@yc}}%
+    \pgfpathlineto{\pgfpoint{\pgf@xc}{\pgf@yc}}%
+  }%
+}
+
+\def\pgfumlcd@umlnote{\pgfutil@ifnextchar[{\pgfumlcd@umlnote@}{\pgfumlcd@umlnote@[]}}
+\def\pgfumlcd@umlnote@[#1]{%
+  \node[anchor=north,draw,shape=umlcdnote,text width=4cm,umlcd style,#1]%
+}
+
+\tikzaddtikzonlycommandshortcutlet{\class}{\pgfumlcd@class}
+\tikzaddtikzonlycommandshortcutlet{\endclass}{\endpgfumlcd@class}
+\tikzaddtikzonlycommandshortcutlet{\interface}{\pgfumlcd@interface}
+\tikzaddtikzonlycommandshortcutlet{\endinterface}{\endpgfumlcd@interface}
+\tikzaddtikzonlycommandshortcutlet{\abstractclass}{\pgfumlcd@abstractclass}
+\tikzaddtikzonlycommandshortcutlet{\endabstractclass}{\endpgfumlcd@abstractclass}
+\tikzaddtikzonlycommandshortcutlet{\staticclass}{\pgfumlcd@staticclass}
+\tikzaddtikzonlycommandshortcutlet{\endstaticclass}{\endpgfumlcd@staticclass}
+\tikzaddtikzonlycommandshortcutlet{\object}{\pgfumlcd@object}
+\tikzaddtikzonlycommandshortcutlet{\endobject}{\endpgfumlcd@object}
+\tikzaddtikzonlycommandshortcutlet{\classAndInterfaceCommon}{\pgfumlcd@classAndInterfaceCommon}
+\tikzaddtikzonlycommandshortcutlet{\endclassAndInterfaceCommon}{\endpgfumlcd@classAndInterfaceCommon}
+\tikzaddtikzonlycommandshortcutlet{\package}{\pgfumlcd@package}
+\tikzaddtikzonlycommandshortcutlet{\endpackage}{\endpgfumlcd@package}
+
+\tikzaddtikzonlycommandshortcutlet{\attribute}{\pgfumlcd@attribute}
+\tikzaddtikzonlycommandshortcutlet{\operation}{\pgfumlcd@operation}
+\tikzaddtikzonlycommandshortcutlet{\inherit}{\pgfumlcd@inherit}
+\tikzaddtikzonlycommandshortcutlet{\implement}{\pgfumlcd@implement}
+\tikzaddtikzonlycommandshortcutlet{\instanceOf}{\pgfumlcd@instanceOf}
+\tikzaddtikzonlycommandshortcutlet{\association}{\pgfumlcd@association}
+\tikzaddtikzonlycommandshortcutlet{\unidirectionalAssociation}{\pgfumlcd@unidirectionalAssociation}
+\tikzaddtikzonlycommandshortcutlet{\aggregation}{\pgfumlcd@aggregation}
+\tikzaddtikzonlycommandshortcutlet{\composition}{\pgfumlcd@composition}
+\tikzaddtikzonlycommandshortcutlet{\umlnote}{\pgfumlcd@umlnote}
