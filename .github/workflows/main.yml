@@ -13,9 +13,12 @@ jobs:
         engine: [pdflatex, lualatex, xelatex, latex]
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
+
+    - name: 'Fixup Run actions/checkout'
+      run: git config --global --add safe.directory '*'
 
     - name: 'Install pgf-umlcd'
       run: |
@@ -47,6 +50,16 @@ jobs:
         tar --xform='s$\(doc\|tex\)/latex/pgf-umlcd/$$g' \
             --xform='s$^$pgf-umlcd/$g' \
             -czvf pgf-umlcd_${GIT_TAG}.tar.gz $(cat FILES)
+
+    - name: 'ZIP: Check'
+      run: |
+        apt-get update -y
+        DEBIAN_FRONTEND=noninteractive apt-get install -y curl poppler-utils
+        curl --retry 3 --retry-all-errors -L -o pkgcheck https://mirrors.ctan.org/support/pkgcheck/bin/pkgcheck
+        chmod +x pkgcheck
+        PKGDIR=$(mktemp -d)
+        tar xzf "pgf-umlcd_${GIT_TAG}.tar.gz" -C "$PKGDIR"
+        ./pkgcheck -d "$PKGDIR/pgf-umlcd"
 
     - name: "ZIP: Sign"
       if: |
