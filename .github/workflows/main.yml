@@ -55,7 +55,7 @@ jobs:
       run: |
         apt-get update -y
         DEBIAN_FRONTEND=noninteractive apt-get install -y curl poppler-utils
-        curl --retry 3 --retry-all-errors -L -o pkgcheck https://mirrors.ctan.org/support/pkgcheck/bin/pkgcheck
+        curl -fSL --retry 3 --retry-all-errors -o pkgcheck https://mirrors.ctan.org/support/pkgcheck/bin/pkgcheck-x86_64-unknown-linux-musl
         chmod +x pkgcheck
         PKGDIR=$(mktemp -d)
         tar xzf "pgf-umlcd_${GIT_TAG}.tar.gz" -C "$PKGDIR"
