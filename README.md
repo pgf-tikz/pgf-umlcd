@@ -1,6 +1,6 @@
 # pgf-umlcd
 
-![CI](https://github.com/pgf-tikz/pgf/workflows/CI/badge.svg)
+[![CI](https://github.com/pgf-tikz/pgf-umlcd/actions/workflows/main.yml/badge.svg)](https://github.com/pgf-tikz/pgf-umlcd/actions/workflows/main.yml)
 
 Some LaTeX macros for UML Class Diagrams.
 
